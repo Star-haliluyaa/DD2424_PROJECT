@@ -48,7 +48,7 @@ class ConvLSTM(nn.Module):
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
-dataset_dir = '3D_dataset/with_base'
+dataset_dir = '../data/3D_dataset/with_base' # You might need to change it to your own directory 
 
 seq_length = 8
 num_chan = 4
@@ -59,7 +59,7 @@ batch_size = 100
 
 for index, file in enumerate(os.listdir(dataset_dir)):
     file = sio.loadmat(dataset_dir + '/' + file)
-    if index == 0:
+    if index == 0:# parse the data from first file
         data = file['data']
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
         random_seq_indices = np.random.permutation(data.shape[0] // seq_length)
@@ -78,7 +78,7 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         train_label = seq_label[:int(0.6 * data.shape[0]), :]
         valid_label = seq_label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]
         test_label = seq_label[:int(0.8 * data.shape[0]), :]
-    else:
+    else: # concatenate the data from other files
         data = file['data']
         random_indices = np.random.permutation(data.shape[0])
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
@@ -105,6 +105,9 @@ x_valid = torch.tensor(valid_data, requires_grad=False, dtype=torch.float32, dev
 vl_valid = torch.tensor(valid_label, requires_grad=False, dtype=torch.float32, device=device)
 x_test = torch.tensor(test_data, requires_grad=False, dtype=torch.float32, device=device)
 vl_test = torch.tensor(test_label, requires_grad=False, dtype=torch.float32, device=device)
+
+print(len(x_test))  
+print(len(vl_test)) 
 
 net = ConvLSTM(embedding_size=16, batch_size=batch_size, num_classes=num_classes).to(device)
 

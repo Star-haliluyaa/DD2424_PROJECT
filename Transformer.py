@@ -79,7 +79,8 @@ class TransformerEncoder(nn.Module):
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
-dataset_dir = '3D_dataset/with_base'
+dataset_dir = '../data/3D_dataset/with_base' # You might need to change it to your own directory 
+
 seq_length = 8
 num_chan = 4
 height = 9
@@ -89,7 +90,7 @@ batch_size = 100
 
 for index, file in enumerate(os.listdir(dataset_dir)):
     file = sio.loadmat(dataset_dir + '/' + file)
-    if index == 0:
+    if index == 0:# parse the data from first file
         data = file['data']
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
         random_seq_indices = np.random.permutation(data.shape[0] // seq_length)
@@ -108,7 +109,7 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         train_label = seq_label[:int(0.6 * data.shape[0]), :]
         valid_label = seq_label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]
         test_label = seq_label[:int(0.8 * data.shape[0]), :]
-    else:
+    else: # concatenate the data from other files
         data = file['data']
         random_indices = np.random.permutation(data.shape[0])
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
@@ -129,12 +130,18 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         valid_label = np.concatenate([valid_label, seq_label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]])
         test_label = np.concatenate([test_label, seq_label[int(0.8 * data.shape[0]):, :]])
 
+torch.cuda.empty_cache()
+del data, label, random_indices, random_seq_indices, file
+
+
 x_train = torch.tensor(train_data, requires_grad=False, dtype=torch.float32, device=device)
 vl_train = torch.tensor(train_label, requires_grad=False, dtype=torch.float32, device=device)
 x_valid = torch.tensor(valid_data, requires_grad=False, dtype=torch.float32, device=device)
 vl_valid = torch.tensor(valid_label, requires_grad=False, dtype=torch.float32, device=device)
 x_test = torch.tensor(test_data, requires_grad=False, dtype=torch.float32, device=device)
 vl_test = torch.tensor(test_label, requires_grad=False, dtype=torch.float32, device=device)
+
+del train_data, train_label, valid_data, valid_label, test_data, test_label
 
 net = TransformerEncoder(image_size=9, patch_size=3, token_dim=16).to(device)
 num_train = x_train.shape[0]
@@ -159,7 +166,11 @@ for epoch in tqdm(range(epochs)):
             train_loss += loss.item()
             valid_output = net(x_valid)
             valid_loss += criterion(valid_output, vl_valid).item()
-    print('epoch: %d training loss: %.3f validation loss: %.3f' % (epoch + 1, train_loss, valid_loss))
+    print('\n epoch: %d training loss: %.3f validation loss: %.3f ' % (epoch + 1, train_loss, valid_loss))
+
+torch.cuda.empty_cache()
+del x_train, vl_train, inputs, outputs, labels, valid_output, loss, mini_batch_indices
+
 
 with torch.no_grad():
     vl_pre = net(x_valid)
@@ -167,6 +178,20 @@ with torch.no_grad():
     vl_valid = torch.argmax(vl_valid, dim=1)
 print('Validation acc after training:')
 print((vl_valid == vl_pre).float().mean())
+
+torch.cuda.empty_cache()
+del x_valid, vl_valid, vl_pre
+
+
+change_gpu_to_cpu = "yes" # use yes if you got  CUDA out of memory.
+
+if change_gpu_to_cpu == "yes":
+    device =torch.device('cpu')
+    net    =net.to(device)
+    x_test = x_test.to(device)
+    vl_test=vl_test.to(device)
+    print(device)
+
 
 with torch.no_grad():
     vl_pre = net(x_test)

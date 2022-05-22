@@ -3,6 +3,14 @@ import scipy.io as sio
 import numpy as np
 import os
 
+# use_baseline
+use_baseline = "yes"
+# Relative dir. for dataset (input)
+dataset_dir = "../data/1D_dataset/"
+# Relative dir. for output
+result_dir = None
+out_dir_with = "../data/3D_dataset/with_base/"
+out_dir_without = "../data/3D_dataset/without_base/"
 
 def read_file(file):
     file = sio.loadmat(file)
@@ -16,6 +24,9 @@ def get_vector_deviation(vector1, vector2):
 
 
 def get_dataset_deviation(trial_data, base_data):
+    # trial_data: 2400*128  (videos*seconds)*(frequencies*channels)
+    # base_data : 40*128    (videos)*(frequencies*channels)
+    # here, we assume the base_data is a constant bias, and we will adjust trial_data accordingly.
     new_dataset = np.empty([0, 128])
     for i in range(0, 2400):
         base_index = i // 60
@@ -43,37 +54,37 @@ def data_1Dto2D(data, Y=9, X=9):
     return data_2D
 
 
-def pre_process(path, y_n):
+def pre_process(path, use_baseline):
     # DE feature vector dimension of each band
     data_3D = np.empty([0, 9, 9])
     sub_vector_len = 32
     trial_data, base_data, arousal_labels, valence_labels, dominance_labels = read_file(path)
-    if y_n == "yes":
-        data = get_dataset_deviation(trial_data, base_data)
+    # 60s       # 3s      # label 1       # label 2       # label 3         
+    if use_baseline == "yes":
+        data = get_dataset_deviation(trial_data, base_data) # consider base_data as bias
         data = preprocessing.scale(data, axis=1, with_mean=True, with_std=True, copy=True)
     else:
         data = preprocessing.scale(trial_data, axis=1, with_mean=True, with_std=True, copy=True)
-    # convert 128 vector ---> 4*9*9 cube
+    # convert 128 (4*32 frequencies*channels) vector ---> 4*9*9 cube (frequencies*new_channels)
     for vector in data:
         for band in range(0, 4):
             data_2D_temp = data_1Dto2D(vector[band * sub_vector_len:(band + 1) * sub_vector_len])
             data_2D_temp = data_2D_temp.reshape(1, 9, 9)
             # print("data_2d_temp shape:",data_2D_temp.shape)
             data_3D = np.vstack([data_3D, data_2D_temp])
-    data_3D = data_3D.reshape(-1, 4, 9, 9)
+    data_3D = data_3D.reshape(-1, 4, 9, 9) # 2400 (videos*seconds) * 4*9*9  (cube, frequencies*new_channels)
     print("final data shape:", data_3D.shape)
     return data_3D, arousal_labels, valence_labels, dominance_labels
 
 
 if __name__ == '__main__':
-    dataset_dir = "1D_dataset/"
-    use_baseline = 'yes'
+
     if use_baseline == "yes":
-        result_dir = "3D_dataset/with_base/"
+        result_dir = out_dir_with
         if not os.path.isdir(result_dir):
             os.makedirs(result_dir)
     else:
-        result_dir = "3D_dataset/without_base/"
+        result_dir = out_dir_without
         if not os.path.isdir(result_dir):
             os.makedirs(result_dir)
 
@@ -83,7 +94,8 @@ if __name__ == '__main__':
         data, arousal_labels, valence_labels, dominance_labels = pre_process(file_path, use_baseline)
         print("final shape:", data.shape)
         sio.savemat(result_dir + "3D" + file,
-                    {"data": data,
-                     "valence_labels": valence_labels,
-                     "arousal_labels": arousal_labels,
-                     "dominance_labels": dominance_labels})
+                    {"data": data,                          # 2400 (videos*seconds) * 4*9*9  (cube, frequencies*new_channels)
+                     "valence_labels": valence_labels,      # 2400      (videos*seconds)
+                     "arousal_labels": arousal_labels,      # 2400      (videos*seconds)
+                     "dominance_labels": dominance_labels}) # 2400      (videos*seconds)
+

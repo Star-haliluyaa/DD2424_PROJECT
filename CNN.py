@@ -6,7 +6,8 @@ import os
 import scipy.io as sio
 from tqdm import tqdm
 
-
+###
+# actually, this behaves like binary number
 def one_hot(y, dim):
     Y = np.zeros((y.shape[0], dim))
     for i in range(y.shape[0]):
@@ -33,10 +34,12 @@ class CNN(nn.Module):
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
-dataset_dir = '3D_dataset/with_base'
+dataset_dir = '../data/3D_dataset/with_base' # You might need to change it to your own directory 
+
+# Reshape the dataset
 for index, file in enumerate(os.listdir(dataset_dir)):
     file = sio.loadmat(dataset_dir + '/' + file)
-    if index == 0:
+    if index == 0: # parse the data from first file
         data = file['data']
         random_indices = np.random.permutation(data.shape[0])
         data = data[random_indices, :, :, :]
@@ -51,13 +54,14 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         train_label = label[:int(0.6 * data.shape[0]), :]
         valid_label = label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]
         test_label = label[:int(0.8 * data.shape[0]), :]
-    else:
+    else: # concatenate the data from other files
         data = file['data']
         random_indices = np.random.permutation(data.shape[0])
         data = data[random_indices, :, :, :]
         train_data = np.concatenate([train_data, data[:int(0.6 * data.shape[0]), :, :, :]])
         valid_data = np.concatenate([valid_data, data[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :, :, :]])
         test_data = np.concatenate([test_data, data[int(0.8 * data.shape[0]):, :, :, :]])
+        ### Each label can only be 0 or 1. So we will apply one-hot
         label = np.int32(file['valence_labels'][0]) \
                 + np.int32(file['arousal_labels'][0]) ** 2 \
                 + np.int32(file['dominance_labels'][0]) ** 4
@@ -67,6 +71,7 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         valid_label = np.concatenate([valid_label, label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]])
         test_label = np.concatenate([test_label, label[int(0.8 * data.shape[0]):, :]])
 
+#Create tensors
 x_train = torch.tensor(train_data, requires_grad=False, dtype=torch.float32, device=device)
 vl_train = torch.tensor(train_label, requires_grad=False, dtype=torch.float32, device=device)
 x_valid = torch.tensor(valid_data, requires_grad=False, dtype=torch.float32, device=device)
@@ -83,6 +88,7 @@ epochs = 20
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(net.parameters())
 
+# train with XX epochs
 for epoch in tqdm(range(epochs)):
     train_loss = 0
     valid_loss = 0
@@ -102,6 +108,7 @@ for epoch in tqdm(range(epochs)):
     print('epoch: %d training loss: %.3f validation loss: %.3f' % (
         epoch + 1, train_loss / num_batches, valid_loss / num_batches))
 
+# check validation
 with torch.no_grad():
     vl_pre = net(x_valid)
     vl_pre = torch.argmax(vl_pre, dim=1)
@@ -109,6 +116,7 @@ with torch.no_grad():
 print('Validation acc after training:')
 print((vl_valid == vl_pre).float().mean())
 
+# check test
 with torch.no_grad():
     vl_pre = net(x_test)
     vl_pre = torch.argmax(vl_pre, dim=1)

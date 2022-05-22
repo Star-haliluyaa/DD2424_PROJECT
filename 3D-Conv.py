@@ -29,11 +29,12 @@ class Conv_3D(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-
+print("torch.cuda.is_available()")
+print(torch.cuda.is_available())
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
-dataset_dir = '3D_dataset/with_base'
+dataset_dir = '../data/3D_dataset/with_base' # You might need to change it to your own directory 
 
 seq_length = 8
 num_chan = 4
@@ -44,7 +45,7 @@ batch_size = 100
 
 for index, file in enumerate(os.listdir(dataset_dir)):
     file = sio.loadmat(dataset_dir + '/' + file)
-    if index == 0:
+    if index == 0: # parse the data from first file
         data = file['data']
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
         data = np.swapaxes(data, 1, 2)
@@ -64,7 +65,7 @@ for index, file in enumerate(os.listdir(dataset_dir)):
         train_label = seq_label[:int(0.6 * data.shape[0]), :]
         valid_label = seq_label[int(0.6 * data.shape[0]):int(0.8 * data.shape[0]), :]
         test_label = seq_label[:int(0.8 * data.shape[0]), :]
-    else:
+    else: # concatenate the data from other files
         data = file['data']
         random_indices = np.random.permutation(data.shape[0])
         data = np.reshape(data, newshape=(-1, seq_length, num_chan, height, width))
